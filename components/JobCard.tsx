@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Job } from '../types';
-import { Mail, Link, Building2, MapPin, CheckCircle2, Copy, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Link, Building2, MapPin, CheckCircle2, Copy, ExternalLink, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 
 interface JobCardProps {
   job: Job;
@@ -10,6 +10,7 @@ interface JobCardProps {
 
 const JobCard: React.FC<JobCardProps> = ({ job, onApply }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'email' | 'coverLetter'>('email');
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = (text: string) => {
@@ -80,56 +81,91 @@ const JobCard: React.FC<JobCardProps> = ({ job, onApply }) => {
       </div>
 
       {isExpanded && (
-        <div className="border-t border-slate-100 bg-slate-50 p-5 rounded-b-xl animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Email</label>
-                <button 
-                  onClick={() => copyToClipboard(job.contactEmail || 'N/A')}
-                  className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
-                >
-                  <Copy size={12} /> Copy
-                </button>
-              </div>
-              <p className="text-sm font-medium text-slate-700 bg-white p-2 rounded border border-slate-200">
-                {job.contactEmail || "Contact not found (Refer to Job Link)"}
-              </p>
-            </div>
+        <div className="border-t border-slate-100 bg-slate-50 rounded-b-xl animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
+          {/* Sub-tabs for Email vs Cover Letter */}
+          <div className="flex border-b border-slate-200 bg-slate-100/50">
+            <button 
+              onClick={() => setActiveSubTab('email')}
+              className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeSubTab === 'email' ? 'bg-white text-indigo-600 border-r border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Mail size={14} /> Application Email
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('coverLetter')}
+              className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeSubTab === 'coverLetter' ? 'bg-white text-indigo-600 border-l border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <FileText size={14} /> Full Cover Letter
+            </button>
+          </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subject Line</label>
-                <button 
-                  onClick={() => copyToClipboard(job.emailSubject)}
-                  className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
-                >
-                  <Copy size={12} /> Copy
-                </button>
-              </div>
-              <p className="text-sm font-medium text-slate-700 bg-white p-2 rounded border border-slate-200">
-                {job.emailSubject}
-              </p>
-            </div>
+          <div className="p-5 space-y-4">
+            {activeSubTab === 'email' ? (
+              <>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Email</label>
+                    <button 
+                      onClick={() => copyToClipboard(job.contactEmail || 'N/A')}
+                      className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
+                    >
+                      <Copy size={12} /> Copy
+                    </button>
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 bg-white p-2 rounded border border-slate-200">
+                    {job.contactEmail || "Contact not found (Refer to Job Link)"}
+                  </p>
+                </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Email Body</label>
-                <button 
-                  onClick={() => copyToClipboard(job.emailBody)}
-                  className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
-                >
-                  <Copy size={12} /> Copy
-                </button>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subject Line</label>
+                    <button 
+                      onClick={() => copyToClipboard(job.emailSubject)}
+                      className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
+                    >
+                      <Copy size={12} /> Copy
+                    </button>
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 bg-white p-2 rounded border border-slate-200">
+                    {job.emailSubject}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Email Body</label>
+                    <button 
+                      onClick={() => copyToClipboard(job.emailBody)}
+                      className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
+                    >
+                      <Copy size={12} /> Copy
+                    </button>
+                  </div>
+                  <div className="text-sm text-slate-700 bg-white p-4 rounded border border-slate-200 whitespace-pre-wrap leading-relaxed shadow-inner max-h-[300px] overflow-y-auto font-mono text-[13px]">
+                    {job.emailBody}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tailored Cover Letter</label>
+                  <button 
+                    onClick={() => copyToClipboard(job.coverLetter)}
+                    className="text-blue-600 text-xs flex items-center gap-1 hover:underline"
+                  >
+                    <Copy size={12} /> Copy Letter
+                  </button>
+                </div>
+                <div className="text-sm text-slate-700 bg-white p-6 rounded border border-slate-200 whitespace-pre-wrap leading-relaxed shadow-inner max-h-[500px] overflow-y-auto font-serif text-[14px]">
+                  {job.coverLetter}
+                </div>
               </div>
-              <div className="text-sm text-slate-700 bg-white p-4 rounded border border-slate-200 whitespace-pre-wrap leading-relaxed shadow-inner max-h-[400px] overflow-y-auto">
-                {job.emailBody}
-              </div>
-            </div>
+            )}
             
             {copied && (
-              <div className="text-center py-1 bg-blue-600 text-white rounded text-xs animate-pulse">
-                Copied to clipboard!
+              <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-2 bg-indigo-600 text-white rounded-full text-xs font-bold shadow-xl animate-bounce z-50">
+                ✓ Copied to clipboard!
               </div>
             )}
           </div>

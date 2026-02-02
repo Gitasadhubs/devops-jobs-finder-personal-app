@@ -32,6 +32,7 @@ export interface Job {
   jdSummary: string;
   emailSubject: string;
   emailBody: string;
+  coverLetter: string;
   contactEmail: string;
   jobLink: string;
   source: string;

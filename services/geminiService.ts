@@ -27,7 +27,7 @@ export const USER_CONTEXT: UserProfile = {
         "Repository management and automated workflow discovery",
         "Real-time execution and live log streaming",
         "Secure authentication with GitHub PATs",
-        "Responsive UI with workflow templates for rapid CI/CD setup"
+        "Responsive UI with workflow templates for easy CI/CD setup"
       ]
     },
     {
@@ -117,10 +117,11 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
         jdSummary: { type: Type.STRING },
         emailSubject: { type: Type.STRING },
         emailBody: { type: Type.STRING },
+        coverLetter: { type: Type.STRING },
         contactEmail: { type: Type.STRING },
         jobLink: { type: Type.STRING },
       },
-      required: ["title", "company", "jdSummary", "emailSubject", "emailBody", "jobLink"]
+      required: ["title", "company", "jdSummary", "emailSubject", "emailBody", "coverLetter", "jobLink"]
     }
   };
 
@@ -139,10 +140,11 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
     Tailoring Instructions:
     1. Filter: ONLY jobs in Lahore or Remote (Lahore companies) posted in the last 24 hours.
     2. Email Tone: Professional, eager junior engineer.
-    3. Content: 
-       - Explicitly link his Cloud/DevOps title and certifications to the JD requirements.
-       - Use the project portfolio (AutoFlow, CI/CD, IaC, etc.) to demonstrate practical expertise.
-       - Signature MUST include: ${USER_CONTEXT.name} | ${USER_CONTEXT.email} | ${USER_CONTEXT.phone} | LinkedIn: ${USER_CONTEXT.linkedIn}.
+    3. Cover Letter: Generate a full, highly professional cover letter (approx 300 words). 
+       - It should be specifically addressed to the hiring manager at the company.
+       - Highlight how his AZ-400 certification and projects (like AutoFlow) directly solve problems mentioned in the JD.
+       - Focus on "Infrastructure as Code", "CI/CD Automation", and "Cloud Reliability".
+    4. Signature MUST include: ${USER_CONTEXT.name} | ${USER_CONTEXT.email} | ${USER_CONTEXT.phone} | LinkedIn: ${USER_CONTEXT.linkedIn}.
 
     Content to Parse:
     ${searchText}
