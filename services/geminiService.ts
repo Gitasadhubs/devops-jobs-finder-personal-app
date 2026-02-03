@@ -2,11 +2,19 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Job, UserProfile } from "../types";
 
-// We do not initialize at top-level to prevent app crash if key is missing during bundle load
+// Helper to safely get the API Key without crashing the browser
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 const getAI = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error("API_KEY is not defined. Please set it in your environment variables.");
+    throw new Error("API_KEY_MISSING: Application environment variables not initialized.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -83,23 +91,24 @@ export const USER_CONTEXT: UserProfile = {
 
 export const searchJobs = async (): Promise<{ text: string; sources: any[] }> => {
   const ai = getAI();
-  const prompt = `SEARCH PROTOCOL: ACTIVE DEVOPS/CLOUD JOBS IN LAHORE, PAKISTAN (PAST 24 HOURS ONLY).
+  const prompt = `SEARCH GROUNDING PROTOCOL: 
+  Location: Lahore, Pakistan ONLY.
+  Target Roles: Junior DevOps Engineer, Associate Cloud Engineer, SRE Intern, DevOps Intern.
+  Freshness: MUST be posted within the last 24-48 hours.
   
-  Target Platforms:
-  1. LinkedIn Jobs (Lahore + Past 24 Hours)
-  2. Rozee.pk, Mustakbil, BrightSpyre
-  3. Career pages of: Systems Ltd, NetSol, Folio3, Arbisoft, Devsinc, Northbay, 10Pearls.
+  Targeting specifically:
+  - LinkedIn Job Postings (filter by Lahore + Entry Level)
+  - Career portals of: Systems Limited, NetSol, Arbisoft, Devsinc, 10Pearls, Northbay, Folio3.
+  - Local boards: Rozee.pk, Mustakbil, Brightspyre.
   
-  STRICT ACCURACY REQUIREMENTS:
-  - Role: DevOps Internship, Junior DevOps Engineer, Associate Cloud/SRE.
-  - Location: MUST BE Lahore, Pakistan (Strict).
-  - Date: Must be posted TODAY or within the last 24 hours.
+  TASK:
+  Find exactly matching jobs. For each, extract:
+  1. Full Job Title
+  2. Company Name
+  3. Direct link to apply
+  4. ANY recruiter email address or HR contact information mentioned in the snippet.
   
-  HR EMAIL DISCOVERY:
-  - Aggressively scan search results for HR email addresses (e.g., hr@company.com, careers@company.pk).
-  - Look for "apply via email", "send resume to", etc.
-  
-  Return a raw list of matches found with their snippets and any visible contact info.`;
+  Search thoroughly for email patterns like [name]@company.com or careers@company.pk.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
@@ -129,7 +138,7 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
         emailSubject: { type: Type.STRING },
         emailBody: { type: Type.STRING },
         coverLetter: { type: Type.STRING },
-        contactEmail: { type: Type.STRING, description: "HR email address found. If not found, predict careers@[company_domain] if high confidence." },
+        contactEmail: { type: Type.STRING, description: "Discovered HR email. If not found in JD, use recruitment@[domain] or hr@[domain] if high confidence." },
         jobLink: { type: Type.STRING },
       },
       required: ["title", "company", "jdSummary", "emailSubject", "emailBody", "coverLetter", "jobLink"]
@@ -137,20 +146,18 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
   };
 
   const tailoringPrompt = `
-    TASK: VERIFY ACCURACY AND TAILOR APPLICATIONS FOR ${USER_CONTEXT.name}.
+    ANALYZE AND TAILOR FOR ASAD ASHRAF (DevOps Specialist).
     
-    ACCURACY CHECK:
-    1. Filter: ONLY Junior/Entry/Intern levels.
-    2. Filter: ONLY Lahore, Pakistan.
+    CRITICAL FILTER:
+    - If the job is NOT in Lahore, discard it.
+    - If the job requires >2 years experience, discard it.
     
-    CONTACT DISCOVERY:
-    - Extract HR emails from the provided snippets.
+    TAILORING GUIDELINES:
+    - Cover Letter: Emphasize AZ-400 certification and the 'AutoFlow' FYP project.
+    - Style: Professional, eager, technically precise.
+    - Context: Mention bachelors at IMS Lahore (Expected 2026).
     
-    TAILORING:
-    - Cover Letter: Approx 350 words, mentioning AZ-400 and the AutoFlow project.
-    - Reference IMS Lahore education.
-    
-    Content:
+    Data Source:
     ${searchText}
   `;
 
@@ -168,12 +175,12 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
   
   return parsedJobs.map((job: any, index: number) => ({
     ...job,
-    id: `${Date.now()}-${index}`,
+    id: `job-${Date.now()}-${index}`,
     foundDate: new Date().toISOString(),
     isNew: true,
     status: 'Pending',
     source: job.jobLink.toLowerCase().includes('linkedin') ? 'LinkedIn' : 
             job.jobLink.toLowerCase().includes('rozee') ? 'Rozee.pk' : 
-            job.jobLink.toLowerCase().includes('.com/careers') ? 'Direct' : 'Portal'
+            job.jobLink.toLowerCase().includes('careers') ? 'Direct' : 'Portal'
   }));
 };
