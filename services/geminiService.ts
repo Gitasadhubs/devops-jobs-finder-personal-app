@@ -2,7 +2,14 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Job, UserProfile } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// We do not initialize at top-level to prevent app crash if key is missing during bundle load
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY is not defined. Please set it in your environment variables.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const USER_CONTEXT: UserProfile = {
   name: "Asad Ashraf",
@@ -75,24 +82,23 @@ export const USER_CONTEXT: UserProfile = {
 };
 
 export const searchJobs = async (): Promise<{ text: string; sources: any[] }> => {
-  const prompt = `SEARCH PROTOCOL: ACTIVE DEVOPS/CLOUD JOBS IN LAHORE (PAST 24 HOURS ONLY).
+  const ai = getAI();
+  const prompt = `SEARCH PROTOCOL: ACTIVE DEVOPS/CLOUD JOBS IN LAHORE, PAKISTAN (PAST 24 HOURS ONLY).
   
   Target Platforms:
-  1. LinkedIn (Job listings posted 'Past 24 hours')
-  2. Rozee.pk / Mustakbil (Local Pakistan job boards)
-  3. Direct Career Pages of: Systems Ltd, NetSol, Folio3, Northbay, 10Pearls, Arbisoft, Devsinc.
+  1. LinkedIn Jobs (Lahore + Past 24 Hours)
+  2. Rozee.pk, Mustakbil, BrightSpyre
+  3. Career pages of: Systems Ltd, NetSol, Folio3, Arbisoft, Devsinc, Northbay, 10Pearls.
   
   STRICT ACCURACY REQUIREMENTS:
-  - Role: DevOps Internship, Junior DevOps Engineer, Associate Cloud/SRE Engineer.
-  - Location: MUST BE Lahore, Pakistan (or Remote if company is based in Lahore).
-  - Date: MUST be posted within the last 24 hours.
+  - Role: DevOps Internship, Junior DevOps Engineer, Associate Cloud/SRE.
+  - Location: MUST BE Lahore, Pakistan (Strict).
+  - Date: Must be posted TODAY or within the last 24 hours.
   
-  HR EMAIL DISCOVERY MISSION:
-  - Scan the job description snippets for ANY email patterns.
-  - Specifically look for phrases like "Send your CV to", "Email us at", or "Contact HR at".
-  - If a specific recruiter name is mentioned, note it.
-  - Prioritize findings that include an @company.com or @company.pk address.
-
+  HR EMAIL DISCOVERY:
+  - Aggressively scan search results for HR email addresses (e.g., hr@company.com, careers@company.pk).
+  - Look for "apply via email", "send resume to", etc.
+  
   Return a raw list of matches found with their snippets and any visible contact info.`;
 
   const response = await ai.models.generateContent({
@@ -110,6 +116,7 @@ export const searchJobs = async (): Promise<{ text: string; sources: any[] }> =>
 };
 
 export const parseAndTailorJobs = async (searchText: string, searchSources: any[]): Promise<Job[]> => {
+  const ai = getAI();
   const schema = {
     type: Type.ARRAY,
     items: {
@@ -122,7 +129,7 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
         emailSubject: { type: Type.STRING },
         emailBody: { type: Type.STRING },
         coverLetter: { type: Type.STRING },
-        contactEmail: { type: Type.STRING, description: "The specific HR or recruitment email discovered. If not explicitly found, use high-confidence company career emails (e.g. hr@systems.ltd for Systems Ltd)." },
+        contactEmail: { type: Type.STRING, description: "HR email address found. If not found, predict careers@[company_domain] if high confidence." },
         jobLink: { type: Type.STRING },
       },
       required: ["title", "company", "jdSummary", "emailSubject", "emailBody", "coverLetter", "jobLink"]
@@ -130,29 +137,21 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
   };
 
   const tailoringPrompt = `
-    TASK: ANALYZE SEARCH RESULTS AND GENERATE HIGHLY ACCURATE, TAILORED APPLICATIONS FOR ${USER_CONTEXT.name}.
+    TASK: VERIFY ACCURACY AND TAILOR APPLICATIONS FOR ${USER_CONTEXT.name}.
     
     ACCURACY CHECK:
-    1. Verify if the job is truly in Lahore, Pakistan.
-    2. Ensure the level is Junior, Entry-level, or Internship.
+    1. Filter: ONLY Junior/Entry/Intern levels.
+    2. Filter: ONLY Lahore, Pakistan.
     
     CONTACT DISCOVERY:
-    - Search deep into the search snippets for contact emails.
-    - If the company is one of the "Lahore Tech Giants" (Systems, NetSol, etc.), you know their common recruitment emails (e.g., recruitment@systemsltd.com, careers@netsolpk.com). Use them if the JD doesn't provide one.
-    - Otherwise, mark as null if unknown.
-
-    TAILORING LOGIC:
-    - Cover Letter: Approx 350 words. Professional, persuasive, and technically deep.
-    - Mention AZ-400 Certification specifically.
-    - Reference bachelors at Institute of Management Sciences (IMS Lahore).
-    - Mention "AutoFlow" project as his flagship FYP.
-    - Email Body: Concise, punchy, designed to get an attachment opened.
-
-    Content to Parse:
+    - Extract HR emails from the provided snippets.
+    
+    TAILORING:
+    - Cover Letter: Approx 350 words, mentioning AZ-400 and the AutoFlow project.
+    - Reference IMS Lahore education.
+    
+    Content:
     ${searchText}
-
-    Search Sources Metadata:
-    ${JSON.stringify(searchSources)}
   `;
 
   const response = await ai.models.generateContent({
