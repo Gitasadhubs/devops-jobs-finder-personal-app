@@ -38,5 +38,6 @@ export interface Job {
   source: string;
   foundDate: string;
   isNew: boolean;
-  status: 'Pending' | 'Applied' | 'Rejected';
+  status: 'Pending' | 'Applied' | 'Rejected' | 'Scheduled';
+  scheduledAt?: string;
 }

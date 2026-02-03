@@ -11,7 +11,7 @@ export const USER_CONTEXT: UserProfile = {
   linkedIn: "https://www.linkedin.com/in/asadkhan-dev/",
   location: "Lahore, Pakistan",
   education: [
-    { degree: "Bachelors", institution: "Pak Aims University", period: "2022-2026" },
+    { degree: "Bachelors", institution: "Institute of Management Sciences (IMS Lahore)", period: "2022-2026" },
     { degree: "ICS", institution: "Aspire College", period: "2018–2020" }
   ],
   skills: ["Linux (Ubuntu/Debian)", "Docker", "Kubernetes", "Jenkins", "Git", "GitHub Actions", "CI/CD pipelines", "Bash", "Python", "Basic C", "Azure Fundamentals", "Workflow Automation", "Terraform", "Ansible", "Prometheus", "Grafana", "ELK Stack"],
@@ -75,21 +75,25 @@ export const USER_CONTEXT: UserProfile = {
 };
 
 export const searchJobs = async (): Promise<{ text: string; sources: any[] }> => {
-  const prompt = `SEARCH PROTOCOL: ACTIVE DEVOPS/CLOUD JOBS LAHORE (PAST 24 HOURS ONLY).
+  const prompt = `SEARCH PROTOCOL: ACTIVE DEVOPS/CLOUD JOBS IN LAHORE (PAST 24 HOURS ONLY).
   
   Target Platforms:
-  1. Official Company Career Pages (Direct)
-  2. LinkedIn Jobs (Filter: Past 24 Hours)
-  3. Rozee.pk, Mustakbil, BrightSpyre
-  4. Local Lahore Tech Hubs (e.g., Arfa Tower companies, NetSol, Systems Ltd, Folio3, etc.)
+  1. LinkedIn (Job listings posted 'Past 24 hours')
+  2. Rozee.pk / Mustakbil (Local Pakistan job boards)
+  3. Direct Career Pages of: Systems Ltd, NetSol, Folio3, Northbay, 10Pearls, Arbisoft, Devsinc.
+  
+  STRICT ACCURACY REQUIREMENTS:
+  - Role: DevOps Internship, Junior DevOps Engineer, Associate Cloud/SRE Engineer.
+  - Location: MUST BE Lahore, Pakistan (or Remote if company is based in Lahore).
+  - Date: MUST be posted within the last 24 hours.
+  
+  HR EMAIL DISCOVERY MISSION:
+  - Scan the job description snippets for ANY email patterns.
+  - Specifically look for phrases like "Send your CV to", "Email us at", or "Contact HR at".
+  - If a specific recruiter name is mentioned, note it.
+  - Prioritize findings that include an @company.com or @company.pk address.
 
-  STRICT CRITERIA:
-  - Role: DevOps Internship, Junior DevOps Engineer, Associate Cloud Engineer.
-  - Location: Lahore (or Remote for Lahore-based companies).
-  - Date: Must be posted TODAY or within the last 24 hours.
-  - Link Quality: PRIORITIZE direct 'apply' links. Avoid third-party 'ad' links.
-
-  Return a raw list of matches found with their snippets.`;
+  Return a raw list of matches found with their snippets and any visible contact info.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
@@ -118,7 +122,7 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
         emailSubject: { type: Type.STRING },
         emailBody: { type: Type.STRING },
         coverLetter: { type: Type.STRING },
-        contactEmail: { type: Type.STRING },
+        contactEmail: { type: Type.STRING, description: "The specific HR or recruitment email discovered. If not explicitly found, use high-confidence company career emails (e.g. hr@systems.ltd for Systems Ltd)." },
         jobLink: { type: Type.STRING },
       },
       required: ["title", "company", "jdSummary", "emailSubject", "emailBody", "coverLetter", "jobLink"]
@@ -126,30 +130,28 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
   };
 
   const tailoringPrompt = `
-    TASK: VERIFY AND TAILOR DEVOPS JOB APPLICATIONS FOR ${USER_CONTEXT.name}.
+    TASK: ANALYZE SEARCH RESULTS AND GENERATE HIGHLY ACCURATE, TAILORED APPLICATIONS FOR ${USER_CONTEXT.name}.
     
-    Candidate Profile:
-    - Name: ${USER_CONTEXT.name}
-    - Professional Title: Cloud & DevOps Engineer
-    - Certifications: ${USER_CONTEXT.certifications.join(", ")}
-    - Education: ${USER_CONTEXT.education.map(e => `${e.degree} from ${e.institution} (${e.period})`).join(", ")}
-    - Core Skills: ${USER_CONTEXT.skills.join(", ")}
-    - Key Projects: ${USER_CONTEXT.projects.map(p => p.name).join(", ")}
-    - LinkedIn: ${USER_CONTEXT.linkedIn}
+    ACCURACY CHECK:
+    1. Verify if the job is truly in Lahore, Pakistan.
+    2. Ensure the level is Junior, Entry-level, or Internship.
+    
+    CONTACT DISCOVERY:
+    - Search deep into the search snippets for contact emails.
+    - If the company is one of the "Lahore Tech Giants" (Systems, NetSol, etc.), you know their common recruitment emails (e.g., recruitment@systemsltd.com, careers@netsolpk.com). Use them if the JD doesn't provide one.
+    - Otherwise, mark as null if unknown.
 
-    Tailoring Instructions:
-    1. Filter: ONLY jobs in Lahore or Remote (Lahore companies) posted in the last 24 hours.
-    2. Email Tone: Professional, eager junior engineer.
-    3. Cover Letter: Generate a full, highly professional cover letter (approx 300 words). 
-       - It should be specifically addressed to the hiring manager at the company.
-       - Highlight how his AZ-400 certification and projects (like AutoFlow) directly solve problems mentioned in the JD.
-       - Focus on "Infrastructure as Code", "CI/CD Automation", and "Cloud Reliability".
-    4. Signature MUST include: ${USER_CONTEXT.name} | ${USER_CONTEXT.email} | ${USER_CONTEXT.phone} | LinkedIn: ${USER_CONTEXT.linkedIn}.
+    TAILORING LOGIC:
+    - Cover Letter: Approx 350 words. Professional, persuasive, and technically deep.
+    - Mention AZ-400 Certification specifically.
+    - Reference bachelors at Institute of Management Sciences (IMS Lahore).
+    - Mention "AutoFlow" project as his flagship FYP.
+    - Email Body: Concise, punchy, designed to get an attachment opened.
 
     Content to Parse:
     ${searchText}
 
-    Search Sources:
+    Search Sources Metadata:
     ${JSON.stringify(searchSources)}
   `;
 
@@ -159,6 +161,7 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
     config: {
       responseMimeType: "application/json",
       responseSchema: schema,
+      thinkingConfig: { thinkingBudget: 2000 }
     },
   });
 
