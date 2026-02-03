@@ -2,12 +2,11 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Job, UserProfile } from "../types";
 
-// Helper to initialize AI inside the request context
+// Helper to initialize AI inside the request context safely
 const getAI = () => {
-  // Access process.env.API_KEY safely
   const key = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
   if (!key || key === "undefined" || key === "") {
-    throw new Error("API_KEY_NOT_FOUND: Please configure your Gemini API Key in Vercel.");
+    throw new Error("API_KEY_NOT_FOUND: Please check your environment variables.");
   }
   return new GoogleGenAI({ apiKey: key });
 };
@@ -44,11 +43,12 @@ export const USER_CONTEXT: UserProfile = {
 
 export const searchJobs = async (): Promise<{ text: string; sources: any[] }> => {
   const ai = getAI();
-  const prompt = `SEARCH PROTOCOL: [Lahore, Pakistan]
-  Targeting: Junior DevOps Engineer, Associate SRE, DevOps Intern, Cloud Associate.
-  Timeline: LAST 24 HOURS ONLY.
-  Focus: LinkedIn, Rozee.pk, Careers at Systems Ltd, NetSol, Arbisoft, Devsinc.
-  Task: Identify exactly matching job titles, company names, and application URLs. Search specifically for HR emails in the snippets.`;
+  const prompt = `SEARCH GROUNDING: 
+  Location: Lahore, Pakistan
+  Keywords: Junior DevOps Engineer, DevOps Intern, Associate Site Reliability Engineer, Cloud Associate.
+  Target Companies: Systems Ltd, NetSol, Arbisoft, Devsinc, 10Pearls, VentureDive, Creative Dots.
+  Timeline: Posted in the last 48 hours.
+  Goal: Find direct job links or HR contact emails.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -65,7 +65,7 @@ export const searchJobs = async (): Promise<{ text: string; sources: any[] }> =>
     };
   } catch (error: any) {
     if (error.message?.includes('401') || error.message?.includes('API_KEY')) {
-      throw new Error("API_KEY_INVALID");
+      throw new Error("AUTHENTICATION_ERROR: The API key provided is invalid or expired.");
     }
     throw error;
   }
@@ -92,10 +92,9 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
     }
   };
 
-  const tailoringPrompt = `Analyze these jobs in Lahore: ${searchText}. 
-  Tailor a professional application for Asad Ashraf. 
-  Emphasize his AZ-400 cert and AutoFlow project. 
-  If no HR email is found, provide a placeholder recruitment@company.com based on the domain.`;
+  const tailoringPrompt = `Analyze the following Lahore job listings: "${searchText}". 
+  Create tailored applications for Asad Ashraf. Focus on his Azure AZ-400 certification and Docker skills. 
+  Ensure the tone is highly professional and proactive. If a contact email isn't in the text, predict a generic HR email for that company.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
@@ -114,6 +113,6 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
     foundDate: new Date().toISOString(),
     isNew: true,
     status: 'Pending',
-    source: 'Verified Hub'
+    source: 'Intelligent Grounding'
   }));
 };

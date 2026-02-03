@@ -139,9 +139,9 @@ const JobCard: React.FC<JobCardProps> = ({ job, onApply, onSchedule }) => {
 
               <button 
                 onClick={composeEmail}
-                className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 ring-4 ring-indigo-50"
+                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 ring-4 ring-indigo-50"
               >
-                <Send size={18} /> Apply
+                <Mail size={18} /> Direct Mail
               </button>
             </>
           )}
@@ -194,8 +194,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, onApply, onSchedule }) => {
                     <div className="p-5 bg-white border-2 border-slate-100 rounded-3xl text-sm font-bold text-slate-700 flex justify-between items-center group">
                       <span className="truncate">{job.contactEmail || "Contact not discovered"}</span>
                       <div className="flex gap-2">
-                        <button onClick={() => copyToClipboard(job.contactEmail || '')} className="p-2 hover:bg-slate-50 rounded-lg text-indigo-600"><Copy size={16}/></button>
-                        <button onClick={composeEmail} className="p-2 hover:bg-slate-50 rounded-lg text-indigo-600"><Send size={16}/></button>
+                        <button onClick={() => copyToClipboard(job.contactEmail || '')} title="Copy Email" className="p-2 hover:bg-slate-50 rounded-lg text-indigo-600"><Copy size={16}/></button>
+                        <button onClick={composeEmail} title="Compose Mail" className="p-2 hover:bg-slate-50 rounded-lg text-indigo-600"><Mail size={16}/></button>
                       </div>
                     </div>
                   </div>
