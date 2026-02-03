@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Briefcase, RefreshCcw, LayoutGrid, List, CheckCircle, Database, Clock, ShieldCheck, Globe, FileText, CheckCircle2, CalendarDays } from 'lucide-react';
+import { Search, Loader2, Briefcase, RefreshCcw, LayoutGrid, List, CheckCircle, Database, Clock, ShieldCheck, Globe, FileText, CheckCircle2, CalendarDays, Zap, Timer } from 'lucide-react';
 import { Job } from './types';
 import { searchJobs, parseAndTailorJobs, USER_CONTEXT } from './services/geminiService';
 import JobCard from './components/JobCard';
 import CVPreview from './components/CVPreview';
 
-const STORAGE_KEY = 'devops-job-pilot-data-v2';
+const STORAGE_KEY = 'devops-job-pilot-data-v3';
+const MAX_DAILY_CREDITS = 5;
+const RESET_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'jobs' | 'cv'>('jobs');
@@ -15,32 +17,80 @@ const App: React.FC = () => {
   const [searchStatus, setSearchStatus] = useState<string>('');
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Applied' | 'Scheduled'>('All');
   const [view, setView] = useState<'grid' | 'list'>('list');
-  const [searchSources, setSearchSources] = useState<any[]>([]);
+  
+  // Credit System State
+  const [credits, setCredits] = useState<number>(MAX_DAILY_CREDITS);
+  const [lastReset, setLastReset] = useState<number>(Date.now());
+  const [timeLeft, setTimeLeft] = useState<string>('');
 
-  // Persistence
+  // Persistence and Credit Reset Logic
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        setJobs(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setJobs(parsed.jobs || []);
+        
+        const now = Date.now();
+        const savedReset = parsed.lastReset || now;
+        
+        // Check if 24 hours have passed since last reset
+        if (now - savedReset >= RESET_INTERVAL_MS) {
+          setCredits(MAX_DAILY_CREDITS);
+          setLastReset(now);
+        } else {
+          setCredits(parsed.credits !== undefined ? parsed.credits : MAX_DAILY_CREDITS);
+          setLastReset(savedReset);
+        }
       } catch (e) {
-        console.error("Failed to load saved jobs", e);
+        console.error("Failed to load saved state", e);
       }
     }
   }, []);
 
+  // Save state on change
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-  }, [jobs]);
+    const state = {
+      jobs,
+      credits,
+      lastReset
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [jobs, credits, lastReset]);
+
+  // Countdown Timer Effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const nextReset = lastReset + RESET_INTERVAL_MS;
+      const diff = nextReset - now;
+
+      if (diff <= 0) {
+        setCredits(MAX_DAILY_CREDITS);
+        setLastReset(now);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lastReset]);
 
   const handleSearch = async () => {
+    if (credits <= 0) {
+      alert(`Search quota reached! Your daily credits will reset in ${timeLeft}.`);
+      return;
+    }
+
     setIsLoading(true);
-    setSearchStatus('Scouring LinkedIn, Career Pages & Portals...');
+    setSearchStatus('Connecting to Gemini Search Grounding...');
     
     try {
       const { text, sources } = await searchJobs();
-      setSearchSources(sources);
-      setSearchStatus('AI analyzing JDs & tailoring applications...');
+      setSearchStatus('AI analyzing JDs & discovering HR emails...');
       
       const newJobs = await parseAndTailorJobs(text, sources);
       
@@ -51,10 +101,15 @@ const App: React.FC = () => {
         return [...uniqueNewJobs, ...updatedPrev];
       });
       
+      setCredits(prev => prev - 1);
       setSearchStatus('');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setSearchStatus('Search encountered an error. Check API configuration.');
+      if (error.message?.includes('quota')) {
+        setSearchStatus('Global API Quota Exceeded. Please try again later.');
+      } else {
+        setSearchStatus('Search failed. Check your API Key in Vercel settings.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -73,10 +128,8 @@ const App: React.FC = () => {
   };
 
   const clearData = () => {
-    if (confirm('Are you sure you want to clear all tracked jobs? This cannot be undone.')) {
+    if (confirm('Are you sure you want to clear all tracked jobs? Credits will not reset.')) {
       setJobs([]);
-      setSearchSources([]);
-      localStorage.removeItem(STORAGE_KEY);
     }
   };
 
@@ -108,37 +161,61 @@ const App: React.FC = () => {
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Search System</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Lahore Recruitment Unit</span>
               </div>
             </div>
           </div>
           <p className="text-slate-500 font-medium flex items-center gap-2 pl-14">
             <ShieldCheck size={18} className="text-indigo-500" />
-            Verified Profile: <strong className="text-slate-800 underline decoration-indigo-200 decoration-2 underline-offset-4">{USER_CONTEXT.name}</strong>
+            Active Session: <strong className="text-slate-800 underline decoration-indigo-200 decoration-2 underline-offset-4">{USER_CONTEXT.name}</strong>
           </p>
         </div>
 
-        <div className="flex items-center gap-3 pl-14 lg:pl-0">
-          <button
-            onClick={handleSearch}
-            disabled={isLoading}
-            className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-[0.97] ${
-              isLoading 
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
-                : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:-translate-y-0.5 shadow-indigo-200 ring-4 ring-indigo-50'
-            }`}
-          >
-            {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-            {isLoading ? 'Scanning Job Boards...' : 'Hunt Fresh Roles'}
-          </button>
-          
-          <button
-            onClick={clearData}
-            title="Clear Data Cache"
-            className="p-4 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
-          >
-            <RefreshCcw size={22} />
-          </button>
+        <div className="flex items-center flex-wrap gap-4 pl-14 lg:pl-0">
+          {/* Credit Tracker */}
+          <div className="flex items-center gap-3 bg-white px-5 py-4 rounded-2xl shadow-sm border border-slate-200">
+            <div className="bg-orange-50 p-2 rounded-lg text-orange-600">
+              <Zap size={20} fill="currentColor" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Search Credits</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black text-slate-900">{credits}</span>
+                <span className="text-xs text-slate-400 font-bold">/ {MAX_DAILY_CREDITS}</span>
+              </div>
+            </div>
+            <div className="ml-4 pl-4 border-l border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Reset In</p>
+              <p className="text-xs font-bold text-indigo-600 tabular-nums flex items-center gap-1">
+                <Timer size={12} /> {timeLeft}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleSearch}
+              disabled={isLoading || credits <= 0}
+              className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold shadow-2xl transition-all active:scale-[0.97] ${
+                isLoading 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
+                  : credits <= 0
+                    ? 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-100 shadow-none'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:-translate-y-0.5 shadow-indigo-200 ring-4 ring-indigo-50'
+              }`}
+            >
+              {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+              {isLoading ? 'Scanning...' : 'Hunt Fresh Roles'}
+            </button>
+            
+            <button
+              onClick={clearData}
+              title="Reset Cache"
+              className="p-4 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
+            >
+              <RefreshCcw size={22} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -148,13 +225,13 @@ const App: React.FC = () => {
           onClick={() => setActiveTab('jobs')}
           className={`px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-all ${activeTab === 'jobs' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
         >
-          <Briefcase size={18} /> Recruitment Dashboard
+          <Briefcase size={18} /> Dashboard
         </button>
         <button 
           onClick={() => setActiveTab('cv')}
           className={`px-8 py-3 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-all ${activeTab === 'cv' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
         >
-          <FileText size={18} /> Professional Resume
+          <FileText size={18} /> My Resume
         </button>
       </nav>
 
@@ -163,11 +240,11 @@ const App: React.FC = () => {
           {/* Stats Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             {[
-              { label: 'Tracking', val: stats.total, color: 'text-slate-900', bg: 'bg-white', icon: <Database size={16}/>, desc: 'Jobs in local cache' },
-              { label: 'Fresh Roles', val: stats.new, color: 'text-indigo-600', bg: 'bg-indigo-50/50', icon: <Clock size={16}/>, desc: 'Found in last 24h' },
-              { label: 'Pending', val: stats.pending, color: 'text-orange-600', bg: 'bg-orange-50/50', icon: <CheckCircle size={16}/>, desc: 'Applications to send' },
-              { label: 'Scheduled', val: stats.scheduled, color: 'text-purple-600', bg: 'bg-purple-50/50', icon: <CalendarDays size={16}/>, desc: 'Queued actions' },
-              { label: 'Applied', val: stats.applied, color: 'text-green-600', bg: 'bg-green-50/50', icon: <CheckCircle2 size={16}/>, desc: 'Successfully tracked' },
+              { label: 'Tracking', val: stats.total, color: 'text-slate-900', bg: 'bg-white', icon: <Database size={16}/>, desc: 'Jobs found' },
+              { label: 'Fresh', val: stats.new, color: 'text-indigo-600', bg: 'bg-indigo-50/50', icon: <Clock size={16}/>, desc: 'New today' },
+              { label: 'Pending', val: stats.pending, color: 'text-orange-600', bg: 'bg-orange-50/50', icon: <CheckCircle size={16}/>, desc: 'To apply' },
+              { label: 'Scheduled', val: stats.scheduled, color: 'text-purple-600', bg: 'bg-purple-50/50', icon: <CalendarDays size={16}/>, desc: 'Queued' },
+              { label: 'Applied', val: stats.applied, color: 'text-green-600', bg: 'bg-green-50/50', icon: <CheckCircle2 size={16}/>, desc: 'Success' },
             ].map((s, idx) => (
               <div key={idx} className={`${s.bg} p-6 rounded-3xl border border-white/50 shadow-sm flex flex-col group hover:shadow-md transition-all`}>
                 <div className="flex items-center gap-2 mb-3">
@@ -228,7 +305,7 @@ const App: React.FC = () => {
                 </div>
                 <h3 className="text-2xl font-[900] text-slate-800 mb-3">{isLoading ? 'Deploying Search Agents...' : 'No Roles Found'}</h3>
                 <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                  The pilot is currently monitoring Lahore's top job boards. Click the button above to start a fresh scan.
+                  The pilot is currently monitoring Lahore's top job boards. Click the search button above (requires credits).
                 </p>
               </div>
             )}
@@ -242,10 +319,7 @@ const App: React.FC = () => {
 
       <footer className="mt-24 py-12 border-t border-slate-200 text-center">
         <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.3em]">
-          &copy; 2024 DevOps Career Pilot | High Reliability Search Agent
-        </p>
-        <p className="mt-4 text-slate-400 text-[10px] font-medium max-w-xl mx-auto italic">
-          Optimized for Asad Ashraf (Cloud & DevOps Specialist). This system utilizes the Gemini-3-Pro engine for real-time career intelligence and automated tailoring.
+          &copy; 2024 DevOps Career Pilot | Asad Ashraf
         </p>
       </footer>
     </div>
