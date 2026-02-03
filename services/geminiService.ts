@@ -2,22 +2,14 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Job, UserProfile } from "../types";
 
-// Safe wrapper to prevent browser crashes
-const getApiKey = () => {
-  try {
-    // In this specific environment, process.env.API_KEY is injected
-    return (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : null;
-  } catch (e) {
-    return null;
-  }
-};
-
+// Helper to initialize AI inside the request context
 const getAI = () => {
-  const apiKey = getApiKey();
-  if (!apiKey || apiKey === "undefined") {
-    throw new Error("API_KEY_NOT_FOUND");
+  // Access process.env.API_KEY safely
+  const key = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  if (!key || key === "undefined" || key === "") {
+    throw new Error("API_KEY_NOT_FOUND: Please configure your Gemini API Key in Vercel.");
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: key });
 };
 
 export const USER_CONTEXT: UserProfile = {
@@ -30,39 +22,33 @@ export const USER_CONTEXT: UserProfile = {
     { degree: "Bachelors", institution: "Institute of Management Sciences (IMS Lahore)", period: "2022-2026" },
     { degree: "ICS", institution: "Aspire College", period: "2018–2020" }
   ],
-  skills: ["Linux (Ubuntu/Debian)", "Docker", "Kubernetes", "Jenkins", "Git", "GitHub Actions", "CI/CD pipelines", "Bash", "Python", "Basic C", "Azure Fundamentals", "Workflow Automation", "Terraform", "Ansible", "Prometheus", "Grafana", "ELK Stack"],
+  skills: ["Linux", "Docker", "Kubernetes", "Jenkins", "Git", "GitHub Actions", "CI/CD", "Bash", "Python", "Terraform", "Ansible", "Prometheus", "Grafana", "Azure Fundamentals"],
   certifications: [
-    "AZ-400: Microsoft Certified DevOps Engineer / Cloud Engineer",
+    "AZ-400: Microsoft Certified DevOps Engineer",
     "Docker Associate Engineer - Corvit Lahore"
   ],
   projects: [
     { 
-      name: "AutoFlow – GitHub Actions Dashboard (FYP)", 
-      description: "Web-based dashboard to manage GitHub Actions workflows with Python (Flask/Django), JavaScript, and REST APIs.",
-      highlights: [
-        "Repository management and automated workflow discovery",
-        "Real-time execution and live log streaming",
-        "Secure authentication with GitHub PATs",
-        "Responsive UI with workflow templates for easy CI/CD setup"
-      ]
+      name: "AutoFlow – GitHub Actions Dashboard", 
+      description: "Web-based dashboard for CI/CD workflow management with Python and REST APIs.",
+      highlights: ["Automated workflow discovery", "Live log streaming", "Responsive UI"]
     },
     {
       name: "CI/CD Pipeline Automation",
-      description: "Automated build, test, and deployment pipeline for web applications using Jenkins and Kubernetes.",
-      highlights: [
-        "Dockerized applications and automated image builds",
-        "Orchestrated deployments to Kubernetes clusters",
-        "Integrated unit testing within the pipeline",
-        "Slack/Email notifications for real-time success/failure alerts"
-      ]
+      description: "Automated build and deploy pipeline using Jenkins and Kubernetes.",
+      highlights: ["Dockerized builds", "Slack integration", "Real-time alerts"]
     }
   ],
-  summary: "Aspiring Cloud & DevOps Engineer, AZ-400 certified and Docker Associate Engineer. Specialized in building robust CI/CD pipelines and Infrastructure as Code."
+  summary: "Aspiring Cloud & DevOps Engineer, AZ-400 certified. Specialized in building robust CI/CD pipelines and workflow automation."
 };
 
 export const searchJobs = async (): Promise<{ text: string; sources: any[] }> => {
   const ai = getAI();
-  const prompt = `SEARCH GROUNDING: Latest Junior DevOps and DevOps Internship roles in Lahore, Pakistan posted in last 48 hours. Focus on Systems Ltd, NetSol, and LinkedIn. Extract company, title, apply link, and HR email if visible.`;
+  const prompt = `SEARCH PROTOCOL: [Lahore, Pakistan]
+  Targeting: Junior DevOps Engineer, Associate SRE, DevOps Intern, Cloud Associate.
+  Timeline: LAST 24 HOURS ONLY.
+  Focus: LinkedIn, Rozee.pk, Careers at Systems Ltd, NetSol, Arbisoft, Devsinc.
+  Task: Identify exactly matching job titles, company names, and application URLs. Search specifically for HR emails in the snippets.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -78,7 +64,7 @@ export const searchJobs = async (): Promise<{ text: string; sources: any[] }> =>
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [],
     };
   } catch (error: any) {
-    if (error.message?.includes('401') || error.message?.includes('API_KEY_INVALID')) {
+    if (error.message?.includes('401') || error.message?.includes('API_KEY')) {
       throw new Error("API_KEY_INVALID");
     }
     throw error;
@@ -106,12 +92,18 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
     }
   };
 
+  const tailoringPrompt = `Analyze these jobs in Lahore: ${searchText}. 
+  Tailor a professional application for Asad Ashraf. 
+  Emphasize his AZ-400 cert and AutoFlow project. 
+  If no HR email is found, provide a placeholder recruitment@company.com based on the domain.`;
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: `Tailor applications for Asad Ashraf based on these jobs: ${searchText}`,
+    contents: tailoringPrompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: schema,
+      thinkingConfig: { thinkingBudget: 2000 }
     },
   });
 
@@ -122,6 +114,6 @@ export const parseAndTailorJobs = async (searchText: string, searchSources: any[
     foundDate: new Date().toISOString(),
     isNew: true,
     status: 'Pending',
-    source: 'Verified Hunt'
+    source: 'Verified Hub'
   }));
 };
